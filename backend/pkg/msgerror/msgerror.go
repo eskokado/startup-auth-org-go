@@ -35,9 +35,14 @@ var (
 	AnErrNameTooShort       = errors.New("name too short")
 	AnErrNameTooLong        = errors.New("name too long")
 	AnErrInvalidPassword    = errors.New("invalid password")
-	AnErrInvalidToken       = errors.New("invalid token")
-	AnErrExpiredToken       = errors.New("expired token")
-	AnErrSendMessageByEmail = errors.New("error send message by email")
+    AnErrInvalidToken       = errors.New("invalid token")
+    AnErrExpiredToken       = errors.New("expired token")
+    AnErrSendMessageByEmail = errors.New("error send message by email")
+    AnErrInvalidRole        = errors.New("invalid role")
+    AnErrInvalidStatus      = errors.New("invalid status")
+    AnErrInvalidPlan        = errors.New("invalid plan")
+    AnErrInvalidCycle       = errors.New("invalid cycle")
+    AnErrNotAllowed         = errors.New("not allowed for current plan")
 )
 
 func Wrap(msg string, err error) error {
