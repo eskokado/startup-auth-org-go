@@ -109,6 +109,12 @@ const AppMenu = () => {
             ]
         },
         {
+            label: 'Billing',
+            items: [
+                { label: 'Planos', icon: 'pi pi-fw pi-credit-card', to: '/billing' }
+            ]
+        },
+        {
             label: 'Hierarchy',
             items: [
                 {
