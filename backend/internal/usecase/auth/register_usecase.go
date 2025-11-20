@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	orgusecase "github.com/eskokado/startup-auth-go/backend/internal/usecase/org"
 	"github.com/eskokado/startup-auth-go/backend/pkg/domain/entity"
 	"github.com/eskokado/startup-auth-go/backend/pkg/domain/providers"
 	"github.com/eskokado/startup-auth-go/backend/pkg/domain/repository"
@@ -16,15 +17,18 @@ import (
 type RegisterUsecase struct {
 	userRepo       repository.UserRepository
 	cryptoProvider providers.CryptoProvider
+	personalOrgUC  *orgusecase.CreatePersonalOrgUsecase
 }
 
 func NewRegisterUsecase(
 	userRepo repository.UserRepository,
 	cryptoProvider providers.CryptoProvider,
+	personalOrgUC *orgusecase.CreatePersonalOrgUsecase,
 ) *RegisterUsecase {
 	return &RegisterUsecase{
 		userRepo:       userRepo,
 		cryptoProvider: cryptoProvider,
+		personalOrgUC:  personalOrgUC,
 	}
 }
 
@@ -107,6 +111,11 @@ func (h *RegisterUsecase) Execute(ctx context.Context, input dto.RegisterParams)
 
 	if savedUser == nil {
 		return msgerror.AnErrNoSavedUser
+	}
+
+	// Cria organização "Personal" padrão
+	if h.personalOrgUC != nil {
+		_ = h.personalOrgUC.Execute(ctx, savedUser.ID)
 	}
 
 	return nil

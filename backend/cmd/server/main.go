@@ -14,12 +14,17 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
-	handlers "github.com/eskokado/startup-auth-go/backend/internal/handlers/auth"
+	authHandlers "github.com/eskokado/startup-auth-go/backend/internal/handlers/auth"
+	billingHandlers "github.com/eskokado/startup-auth-go/backend/internal/handlers/billing"
+	orgHandlers "github.com/eskokado/startup-auth-go/backend/internal/handlers/org"
+	taskHandlers "github.com/eskokado/startup-auth-go/backend/internal/handlers/task"
 	"github.com/eskokado/startup-auth-go/backend/internal/middleware"
 	"github.com/eskokado/startup-auth-go/backend/internal/providers"
 	provider "github.com/eskokado/startup-auth-go/backend/internal/providers"
 	repository "github.com/eskokado/startup-auth-go/backend/internal/repositories"
-	usecase "github.com/eskokado/startup-auth-go/backend/internal/usecase/auth"
+	authUsecase "github.com/eskokado/startup-auth-go/backend/internal/usecase/auth"
+	orgUsecase "github.com/eskokado/startup-auth-go/backend/internal/usecase/org"
+	taskUsecase "github.com/eskokado/startup-auth-go/backend/internal/usecase/task"
 	service "github.com/eskokado/startup-auth-go/backend/pkg/domain/services"
 )
 
@@ -38,10 +43,14 @@ func main() {
 	if err != nil {
 		panic("failed to connect database")
 	}
-	db.AutoMigrate(&repository.GormUser{})
+	db.AutoMigrate(&repository.GormUser{}, &repository.GormOrganization{}, &repository.GormMembership{}, &repository.GormInvitation{}, &repository.GormTask{})
 
-	// 2. Inicializar repositório
+	// 2. Inicializar repositórios
 	userRepo := repository.NewGormUserRepository(db)
+	orgRepo := repository.NewGormOrganizationRepository(db)
+	memberRepo := repository.NewGormMembershipRepository(db)
+	invRepo := repository.NewGormInvitationRepository(db)
+	taskRepo := repository.NewGormTaskRepository(db)
 
 	// 3. Inicializar serviços
 	emailService := service.NewEmailService(sender)
@@ -55,28 +64,52 @@ func main() {
 
 	// 4. Inicializar provedores
 	cryptoProvider := provider.NewBcryptProvider(bcrypt.DefaultCost)
-	tokenProvider := provider.NewJWTProvider("secret-key", 24*time.Hour)
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		jwtSecret = "dev-secret"
+	}
+	tokenProvider := provider.NewJWTProvider(jwtSecret, 24*time.Hour)
 	blacklistProvider := providers.NewRedisBlacklist(rdb)
+	stripeProvider := providers.NewStripeProvider()
 
 	// 5. Inicializar casos de uso
-	registerUseCase := usecase.NewRegisterUsecase(userRepo, cryptoProvider)
-	loggerUseCase := usecase.NewLoginUsecase(
+    personalOrgUC := orgUsecase.NewCreatePersonalOrgUsecase(orgRepo, memberRepo)
+    registerUseCase := authUsecase.NewRegisterUsecase(userRepo, cryptoProvider, personalOrgUC)
+	loggerUseCase := authUsecase.NewLoginUsecase(
 		userRepo, cryptoProvider, tokenProvider, blacklistProvider,
 	)
-	logoutUseCase := usecase.NewLogoutUsecase(blacklistProvider)
-	requestPasswordResetUC := usecase.NewRequestPasswordReset(userRepo, emailService)
-	resetPasswordUC := usecase.NewResetPassword(userRepo)
-	updateNameUC := usecase.NewUpdateNameUseCase(userRepo)
-	updatePasswordUC := usecase.NewUpdatePasswordUseCase(userRepo, cryptoProvider)
+	logoutUseCase := authUsecase.NewLogoutUsecase(blacklistProvider)
+	requestPasswordResetUC := authUsecase.NewRequestPasswordReset(userRepo, emailService)
+	resetPasswordUC := authUsecase.NewResetPassword(userRepo)
+	updateNameUC := authUsecase.NewUpdateNameUseCase(userRepo)
+	updatePasswordUC := authUsecase.NewUpdatePasswordUseCase(userRepo, cryptoProvider)
+
+	// Casos de uso de organização e tarefas
+	inviteUC := orgUsecase.NewInviteMemberUsecase(invRepo, memberRepo, orgRepo, 72*time.Hour, os.Getenv("APP_BASE_URL"))
+	acceptInviteUC := orgUsecase.NewAcceptInviteUsecase(invRepo, memberRepo)
+	createTaskUC := taskUsecase.NewCreateTaskUsecase(taskRepo)
+	listTasksUC := taskUsecase.NewListTasksUsecase(taskRepo)
+	updateTaskUC := taskUsecase.NewUpdateTaskStatusUsecase(taskRepo)
+	deleteTaskUC := taskUsecase.NewDeleteTaskUsecase(taskRepo)
 
 	// 6. Criar handlers HTTP
-	registerHTTPHandler := handlers.NewRegisterHandler(registerUseCase, userRepo)
-	loggerHTTPHandler := handlers.NewLoginHandler(loggerUseCase)
-	logoutHTTPHandler := handlers.NewLogoutHandler(logoutUseCase)
-	forgotPasswordHandler := handlers.NewForgotPasswordHandler(requestPasswordResetUC)
-	resetPasswordHandler := handlers.NewResetPasswordHandler(resetPasswordUC)
-	updateNameHandler := handlers.NewUpdateNameHandler(updateNameUC)
-	updatePasswordHandler := handlers.NewUpdatePasswordHandler(updatePasswordUC)
+	registerHTTPHandler := authHandlers.NewRegisterHandler(registerUseCase, userRepo)
+	loggerHTTPHandler := authHandlers.NewLoginHandler(loggerUseCase)
+	logoutHTTPHandler := authHandlers.NewLogoutHandler(logoutUseCase)
+	forgotPasswordHandler := authHandlers.NewForgotPasswordHandler(requestPasswordResetUC)
+	resetPasswordHandler := authHandlers.NewResetPasswordHandler(resetPasswordUC)
+	updateNameHandler := authHandlers.NewUpdateNameHandler(updateNameUC)
+	updatePasswordHandler := authHandlers.NewUpdatePasswordHandler(updatePasswordUC)
+
+	inviteHandler := orgHandlers.NewInviteHandler(inviteUC)
+	acceptInviteHandler := orgHandlers.NewAcceptInviteHandler(acceptInviteUC)
+	getPersonalOrgHandler := orgHandlers.NewGetPersonalOrgHandler(orgRepo)
+	createTaskHandler := taskHandlers.NewCreateTaskHandler(createTaskUC)
+	listTasksHandler := taskHandlers.NewListTasksHandler(listTasksUC)
+	updateTaskHandler := taskHandlers.NewUpdateTaskStatusHandler(updateTaskUC)
+	deleteTaskHandler := taskHandlers.NewDeleteTaskHandler(deleteTaskUC)
+
+	checkoutHandler := billingHandlers.NewCheckoutHandler(stripeProvider)
 
 	// 7. Configurar roteador Gin
 	router := gin.Default()
@@ -102,6 +135,18 @@ func main() {
 	router.POST("/auth/reset-password", resetPasswordHandler.Handle)
 	router.PUT("/user/name/:userID", authMiddleware, updateNameHandler.Handle)
 	router.PUT("/user/password/:userID", authMiddleware, updatePasswordHandler.Handle)
+
+	// Organização e tarefas
+	router.GET("/org/personal/:ownerID", authMiddleware, getPersonalOrgHandler.Handle)
+	router.POST("/org/invite", authMiddleware, inviteHandler.Handle)
+	router.POST("/org/invite/accept", authMiddleware, acceptInviteHandler.Handle)
+	router.POST("/tasks", authMiddleware, createTaskHandler.Handle)
+	router.GET("/tasks", authMiddleware, listTasksHandler.Handle)
+	router.PUT("/tasks/status", authMiddleware, updateTaskHandler.Handle)
+	router.DELETE("/tasks/:id", authMiddleware, deleteTaskHandler.Handle)
+
+	// Billing
+	router.POST("/billing/checkout", authMiddleware, checkoutHandler.Handle)
 
 	// 9. Iniciar o servidor
 	router.Run(":8080")
