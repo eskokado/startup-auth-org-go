@@ -8,6 +8,8 @@ type TokenProvider interface {
 }
 
 type Claims struct {
-	UserID string `json:"uid"`
-	jwt.RegisteredClaims
+    UserID string `json:"uid"`
+    OrganizationID string `json:"org_id"`
+    Plan string `json:"plan"`
+    jwt.RegisteredClaims
 }

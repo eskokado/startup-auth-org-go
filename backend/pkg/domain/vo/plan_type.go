@@ -1,6 +1,9 @@
 package vo
 
-import "github.com/eskokado/startup-auth-go/backend/pkg/msgerror"
+import (
+    "encoding/json"
+    "github.com/eskokado/startup-auth-go/backend/pkg/msgerror"
+)
 
 type PlanType struct{ value string }
 
@@ -20,3 +23,4 @@ func NewPlanType(v string) (PlanType, error) {
 
 func (p PlanType) String() string { return p.value }
 func (p PlanType) IsEmpty() bool { return p.value == "" }
+func (p PlanType) MarshalJSON() ([]byte, error) { return json.Marshal(p.value) }

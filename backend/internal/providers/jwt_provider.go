@@ -21,19 +21,21 @@ func NewJWTProvider(secret string, expiry time.Duration) *JWTProvider {
 }
 
 func (j *JWTProvider) Generate(claims interface{}) (string, error) {
-	c, ok := claims.(providers.Claims)
-	if !ok {
-		return "", errors.New("tipo de claims inválido")
-	}
+    c, ok := claims.(providers.Claims)
+    if !ok {
+        return "", errors.New("tipo de claims inválido")
+    }
 
-	expirationTime := time.Now().Add(j.expiry)
+    expirationTime := time.Now().Add(j.expiry)
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"sub":     c.RegisteredClaims.Subject,
-		"exp":     expirationTime.Unix(),
-		"user_id": c.UserID,
-	})
-	return token.SignedString(j.secretKey)
+    token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+        "sub":     c.RegisteredClaims.Subject,
+        "exp":     expirationTime.Unix(),
+        "user_id": c.UserID,
+        "org_id":  c.OrganizationID,
+        "plan":    c.Plan,
+    })
+    return token.SignedString(j.secretKey)
 }
 
 func (j *JWTProvider) Validate(token string) (interface{}, error) {
@@ -51,10 +53,10 @@ func (j *JWTProvider) Validate(token string) (interface{}, error) {
 		return providers.Claims{}, errors.New("subject não encontrado ou inválido")
 	}
 
-	userID, ok := claims["user_id"].(string)
-	if !ok {
-		return providers.Claims{}, errors.New("user_id não encontrado ou inválido")
-	}
+    userID, ok := claims["user_id"].(string)
+    if !ok {
+        return providers.Claims{}, errors.New("user_id não encontrado ou inválido")
+    }
 
 	expFloat, ok := claims["exp"].(float64)
 	if !ok {
@@ -62,11 +64,16 @@ func (j *JWTProvider) Validate(token string) (interface{}, error) {
 	}
 	expirationTime := time.Unix(int64(expFloat), 0)
 
-	return providers.Claims{
-		UserID: userID,
-		RegisteredClaims: jwt.RegisteredClaims{
-			Subject:   subject,
-			ExpiresAt: jwt.NewNumericDate(expirationTime),
-		},
-	}, nil
+    orgID, _ := claims["org_id"].(string)
+    plan, _ := claims["plan"].(string)
+
+    return providers.Claims{
+        UserID:         userID,
+        OrganizationID: orgID,
+        Plan:           plan,
+        RegisteredClaims: jwt.RegisteredClaims{
+            Subject:   subject,
+            ExpiresAt: jwt.NewNumericDate(expirationTime),
+        },
+    }, nil
 }

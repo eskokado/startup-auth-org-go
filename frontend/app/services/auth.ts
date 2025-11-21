@@ -18,6 +18,11 @@ export type UpdatePasswordType = {
     password: string
 }
 
+export type UpdateNameType = {
+    user_id: string
+    name: string
+}
+
 export const authApi = {
     login: async (email: string, password: string) => {
         const response = await api.post('/auth/login', {
@@ -56,6 +61,13 @@ export const authApi = {
             password: props.password
         });
 
+        return response.data;
+    },
+
+    updateName: async (props: UpdateNameType) => {
+        const response = await api.put(`/user/name/${props.user_id}`, {
+            name: props.name,
+        });
         return response.data;
     },
 

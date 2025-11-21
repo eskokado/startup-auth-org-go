@@ -1,8 +1,9 @@
 package vo
 
 import (
-	"github.com/eskokado/startup-auth-go/backend/pkg/msgerror"
-	"github.com/google/uuid"
+    "encoding/json"
+    "github.com/eskokado/startup-auth-go/backend/pkg/msgerror"
+    "github.com/google/uuid"
 )
 
 type ID struct {
@@ -27,9 +28,13 @@ func ParseID(s string) (ID, error) {
 }
 
 func (i ID) String() string {
-	return i.value.String()
+    return i.value.String()
 }
 
 func (i ID) Equal(other ID) bool {
-	return i.value == other.value
+    return i.value == other.value
+}
+
+func (i ID) MarshalJSON() ([]byte, error) {
+    return json.Marshal(i.String())
 }
