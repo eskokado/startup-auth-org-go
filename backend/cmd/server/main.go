@@ -68,16 +68,16 @@ func main() {
 	if jwtSecret == "" {
 		jwtSecret = "dev-secret"
 	}
-	tokenProvider := provider.NewJWTProvider(jwtSecret, 24*time.Hour)
+    tokenProvider := provider.NewJWTProvider(jwtSecret, 1*time.Hour)
 	blacklistProvider := providers.NewRedisBlacklist(rdb)
 	stripeProvider := providers.NewStripeProvider()
 
 	// 5. Inicializar casos de uso
     personalOrgUC := orgUsecase.NewCreatePersonalOrgUsecase(orgRepo, memberRepo)
     registerUseCase := authUsecase.NewRegisterUsecase(userRepo, cryptoProvider, personalOrgUC)
-	loggerUseCase := authUsecase.NewLoginUsecase(
-		userRepo, cryptoProvider, tokenProvider, blacklistProvider,
-	)
+    loggerUseCase := authUsecase.NewLoginUsecase(
+        userRepo, cryptoProvider, tokenProvider, blacklistProvider, orgRepo,
+    )
 	logoutUseCase := authUsecase.NewLogoutUsecase(blacklistProvider)
 	requestPasswordResetUC := authUsecase.NewRequestPasswordReset(userRepo, emailService)
 	resetPasswordUC := authUsecase.NewResetPassword(userRepo)

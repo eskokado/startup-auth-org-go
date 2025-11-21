@@ -8,14 +8,14 @@ import (
 
 // Task simples por organização
 type Task struct {
-    ID             vo.ID
-    OrganizationID vo.ID
-    Title          string
-    Description    string
-    Status         vo.TaskStatus
-    AssigneeID     *vo.ID
-    CreatedAt      time.Time
-    UpdatedAt      time.Time
+    ID             vo.ID        `json:"id"`
+    OrganizationID vo.ID        `json:"organization_id"`
+    Title          string       `json:"title"`
+    Description    string       `json:"description"`
+    Status         vo.TaskStatus `json:"status"`
+    AssigneeID     *vo.ID       `json:"assignee_id"`
+    CreatedAt      time.Time    `json:"created_at"`
+    UpdatedAt      time.Time    `json:"updated_at"`
 }
 
 func NewTask(orgID vo.ID, title string, description string) (*Task, error) {
