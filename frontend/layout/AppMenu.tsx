@@ -92,6 +92,11 @@ const AppMenu = () => {
                     to: '/pages/crud'
                 },
                 {
+                    label: 'Tarefas',
+                    icon: 'pi pi-fw pi-check-square',
+                    to: '/pages/tasks'
+                },
+                {
                     label: 'Timeline',
                     icon: 'pi pi-fw pi-calendar',
                     to: '/pages/timeline'

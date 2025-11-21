@@ -14,24 +14,27 @@ import (
 )
 
 type LoginUsecase struct {
-	userRepo          repository.UserRepository
-	cryptoProvider    providers.CryptoProvider
-	tokenProvider     providers.TokenProvider
-	blacklistProvider providers.BlacklistProvider
+    userRepo          repository.UserRepository
+    cryptoProvider    providers.CryptoProvider
+    tokenProvider     providers.TokenProvider
+    blacklistProvider providers.BlacklistProvider
+    orgRepo           repository.OrganizationRepository
 }
 
 func NewLoginUsecase(
-	userRepo repository.UserRepository,
-	cryptoProvider providers.CryptoProvider,
-	tokenProvider providers.TokenProvider,
-	blacklistProvider providers.BlacklistProvider,
+    userRepo repository.UserRepository,
+    cryptoProvider providers.CryptoProvider,
+    tokenProvider providers.TokenProvider,
+    blacklistProvider providers.BlacklistProvider,
+    orgRepo repository.OrganizationRepository,
 ) *LoginUsecase {
-	return &LoginUsecase{
-		userRepo:          userRepo,
-		cryptoProvider:    cryptoProvider,
-		tokenProvider:     tokenProvider,
-		blacklistProvider: blacklistProvider,
-	}
+    return &LoginUsecase{
+        userRepo:          userRepo,
+        cryptoProvider:    cryptoProvider,
+        tokenProvider:     tokenProvider,
+        blacklistProvider: blacklistProvider,
+        orgRepo:           orgRepo,
+    }
 }
 func (h *LoginUsecase) Execute(ctx context.Context, email string, password string) (dto.LoginResult, error) {
 	validationErrs := msgerror.NewValidationErrors()
@@ -57,14 +60,14 @@ func (h *LoginUsecase) Execute(ctx context.Context, email string, password strin
 	// Convertemos para vo.Email (já validado acima, então não haverá erro)
 	validEmail, _ := vo.NewEmail(email)
 
-	user, err := h.userRepo.GetByEmail(ctx, validEmail)
-	if errors.Is(err, msgerror.AnErrNotFound) {
-		// Por segurança, não revelamos que o usuário não existe
-		return dto.LoginResult{}, msgerror.AnErrInvalidCredentials
-	}
-	if err != nil {
-		return dto.LoginResult{}, msgerror.Wrap("failed to get user", err)
-	}
+    user, err := h.userRepo.GetByEmail(ctx, validEmail)
+    if errors.Is(err, msgerror.AnErrNotFound) || user == nil {
+        // Por segurança, não revelamos que o usuário não existe
+        return dto.LoginResult{}, msgerror.AnErrInvalidCredentials
+    }
+    if err != nil {
+        return dto.LoginResult{}, msgerror.Wrap("failed to get user", err)
+    }
 
 	match, err := h.cryptoProvider.Compare(password, user.PasswordHash.String())
 	if err != nil {
@@ -74,14 +77,25 @@ func (h *LoginUsecase) Execute(ctx context.Context, email string, password strin
 		return dto.LoginResult{}, msgerror.AnErrInvalidCredentials
 	}
 
-	// Gerar token JWT
-	claims := providers.Claims{
-		UserID: user.ID.String(),
-		RegisteredClaims: jwt.RegisteredClaims{
-			Subject:   user.Email.String(),
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
-		},
-	}
+    // Obter organização pessoal e incluir dados no token
+    org, _ := h.orgRepo.GetByOwnerID(ctx, user.ID)
+    orgID := ""
+    plan := ""
+    if org != nil {
+        orgID = org.ID.String()
+        plan = org.Plan.String()
+    }
+
+    // Gerar token JWT
+    claims := providers.Claims{
+        UserID:         user.ID.String(),
+        OrganizationID: orgID,
+        Plan:           plan,
+        RegisteredClaims: jwt.RegisteredClaims{
+            Subject:   user.Email.String(),
+            ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
+        },
+    }
 
 	token, err := h.tokenProvider.Generate(claims)
 	if err != nil {

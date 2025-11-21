@@ -1,6 +1,7 @@
 package vo
 
 import (
+    "encoding/json"
     "fmt"
     "strings"
 
@@ -33,3 +34,5 @@ func (n OrganizationName) String() string {
 func (n OrganizationName) IsEmpty() bool {
     return n.value == ""
 }
+
+func (n OrganizationName) MarshalJSON() ([]byte, error) { return json.Marshal(n.value) }

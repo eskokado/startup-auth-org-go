@@ -35,6 +35,12 @@ api.interceptors.response.use(
             localStorage.setItem('user-id', newUserId)
             localStorage.setItem('user-name', newUserName)
             localStorage.setItem('user-email', newUserEmail)
+            const payload = decodeJwt(newAccessToken);
+            if (payload) {
+                if (payload.org_id) localStorage.setItem('org-id', String(payload.org_id));
+                if (payload.plan) localStorage.setItem('plan', String(payload.plan));
+                if (payload.exp) localStorage.setItem('token-exp', String(payload.exp));
+            }
         }
 
         return response;
@@ -70,3 +76,12 @@ api.interceptors.response.use(
 );
 
 export default api;
+const decodeJwt = (token: string): any | null => {
+    try {
+        const parts = token.split('.');
+        if (parts.length !== 3) return null;
+        return JSON.parse(atob(parts[1]));
+    } catch {
+        return null;
+    }
+};

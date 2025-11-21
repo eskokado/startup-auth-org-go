@@ -8,11 +8,11 @@ import (
 
 // Organization representa uma organização SaaS
 type Organization struct {
-    ID        vo.ID
-    Name      vo.OrganizationName
-    OwnerID   vo.ID
-    Plan      vo.PlanType
-    CreatedAt time.Time
+    ID        vo.ID              `json:"id"`
+    Name      vo.OrganizationName `json:"name"`
+    OwnerID   vo.ID              `json:"owner_id"`
+    Plan      vo.PlanType        `json:"plan"`
+    CreatedAt time.Time          `json:"created_at"`
 }
 
 func NewOrganization(name vo.OrganizationName, ownerID vo.ID) *Organization {
